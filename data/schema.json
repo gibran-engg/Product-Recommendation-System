@@ -1,0 +1,31 @@
+{
+  "fields": [
+    { "name": "timestamp", "type": "datetime (ISO 8601)", "nullable": false,
+      "description": "When the event occurred" },
+
+    { "name": "event_type", "type": "string", "nullable": false,
+      "allowed_values": ["view", "cart", "purchase", "remove_from_cart"],
+      "description": "Type of user interaction with the item" },
+
+    { "name": "item_id", "type": "integer", "nullable": false,
+      "description": "Unique identifier for the product" },
+
+    { "name": "category_id", "type": "integer", "nullable": true,
+      "description": "Numeric category identifier" },
+
+    { "name": "category_code", "type": "string", "nullable": true,
+      "description": "Dot-separated category path, e.g. 'electronics.smartphone'. Feeds the TF-IDF content-based model. Can be blank even when category_id is present (see row 2, 7)." },
+
+    { "name": "brand", "type": "string", "nullable": true,
+      "description": "Product brand. Feeds the TF-IDF content-based model. Can be blank even when category_code is present (see row 4)." },
+
+    { "name": "price", "type": "float", "nullable": false,
+      "description": "Product price at time of event. Guaranteed > 0 by the cleaning pipeline." },
+
+    { "name": "user_id", "type": "integer", "nullable": false,
+      "description": "Unique identifier for the user performing the event" },
+
+    { "name": "session_id", "type": "string (UUID)", "nullable": false,
+      "description": "Groups events into a single browsing session. Required for real-time re-ranking; every row in this cleaned dataset has one." }
+  ]
+}
