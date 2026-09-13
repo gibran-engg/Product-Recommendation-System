@@ -1,0 +1,56 @@
+# ============================================================
+# Product Recommendation System — Full Project Requirements
+# ============================================================
+# Organized by which service/track each dependency belongs to.
+# For Docker builds, each service should still use its own
+# scoped requirements.txt (see notes at the bottom) — this file
+# is for local/Colab development where you want everything
+# available in one environment.
+
+# --- Ingestion (Kafka producers/consumers) -------------------
+kafka-python>=2.0.2
+
+# --- Processing / Feature Engineering / Modeling --------------
+pyspark>=3.5.0
+pandas>=2.0.0
+numpy>=1.26.0
+scikit-learn>=1.4.0
+pyarrow>=15.0.0          # Parquet support for Spark/Pandas interop
+
+# --- Real-Time Layer (session consumer + bandit) --------------
+# (kafka-python and numpy above already cover this)
+
+# --- Serving Layer (API + cache) -------------------------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+redis>=5.0.0
+pydantic>=2.6.0
+
+# --- Experimentation (A/B testing + stats) ----------------------
+psycopg2-binary>=2.9.9
+scipy>=1.12.0
+
+# --- Monitoring -------------------------------------------------
+prometheus-fastapi-instrumentator>=7.0.0
+
+# --- Shared / Config ----------------------------------------------
+python-dotenv>=1.0.0
+sqlalchemy>=2.0.0
+
+ipykernel>=6.29.0
+
+# ============================================================
+# NOT included here — install separately:
+#
+# apache-airflow
+#   Airflow has strict, version-specific dependency constraints
+#   that conflict with a general requirements.txt. Install it
+#   using their official constraints file, or better, just use
+#   the official Airflow Docker image (already planned in
+#   orchestration/airflow/Dockerfile) instead of pip-installing
+#   it locally.
+#   Reference: https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html
+#
+# React / Node dependencies (frontend/) — managed via package.json,
+#   not this file.
+# ============================================================
