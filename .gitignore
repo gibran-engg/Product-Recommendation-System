@@ -1,3 +1,28 @@
 # Large datasets
 data/dataset/2019-Oct.csv
 data/dataset/cleaned/cleaned_events.csv
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Airflow
+orchestration/airflow/logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
