@@ -1,0 +1,151 @@
+version: "3.8"
+
+services:
+
+  # ---------------------------------------------------------------
+  # Kafka + Zookeeper — needed right now for Task 1 (Week 1)
+  # ---------------------------------------------------------------
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+
+  # ---------------------------------------------------------------
+  # HDFS — data lake for raw event storage
+  # ---------------------------------------------------------------
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    hostname: namenode
+    environment:
+      - CLUSTER_NAME=recsys-cluster
+    env_file:
+      - .env
+    ports:
+      - "9870:9870"   # HDFS web UI
+      - "8020:8020"   # HDFS RPC
+    volumes:
+      - hdfs_namenode:/hadoop/dfs/name
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    hostname: datanode
+    depends_on:
+      - namenode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    ports:
+      - "9864:9864"   # DataNode web UI — WebHDFS redirects land here
+      - "9866:9866"   # DataNode data transfer (raw RPC, not used by WebHDFS but harmless to expose)
+    volumes:
+      - hdfs_datanode:/hadoop/dfs/data
+
+  # ---------------------------------------------------------------
+  # Redis — serving cache
+  # ---------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # ---------------------------------------------------------------
+  # PostgreSQL — metadata + A/B logs
+  # ---------------------------------------------------------------
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: recsys
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # ---------------------------------------------------------------
+  # Airflow — pipeline orchestration (nightly retrain DAG)
+  # ---------------------------------------------------------------
+  airflow:
+    build: ./orchestration/airflow
+    container_name: airflow
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://admin:admin@postgres/recsys
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./orchestration/airflow/dags:/opt/airflow/dags
+
+  # ---------------------------------------------------------------
+  # FastAPI — serving layer
+  # ---------------------------------------------------------------
+  api:
+    build: ./serving
+    container_name: api
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      POSTGRES_DSN: postgresql://admin:admin@postgres:5432/recsys
+    ports:
+      - "8000:8000"
+
+  # ---------------------------------------------------------------
+  # Monitoring — Prometheus + Grafana
+  # ---------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:
+  redis_data:
+  postgres_data:
+  grafana_data:

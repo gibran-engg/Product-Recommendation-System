@@ -1,0 +1,6 @@
+13/09/2026 12:00pm
+    Gibran has verified the required dataset, cleaned it with python script, written the json schema for the same, and set up docker 
+13/09/2026 3:30pm
+    Gibran has established primary pipeline connection from kafka to hdfs using docker container, 
+    Analysed the 'cleaned_events.csv' under data\dataset\cleaned using exploratory data anaylsis in 'eda.ipynb' under notebooks\eda.ipynb
+    Listed the findings in a markdown below the cells, need to collaborate and engineer additional features for the system.
