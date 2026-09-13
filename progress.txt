@@ -4,3 +4,20 @@
     Gibran has established primary pipeline connection from kafka to hdfs using docker container, 
     Analysed the 'cleaned_events.csv' under data\dataset\cleaned using exploratory data anaylsis in 'eda.ipynb' under notebooks\eda.ipynb
     Listed the findings in a markdown below the cells, need to collaborate and engineer additional features for the system.
+
+13/09/2026 - 11:00 pm
+    Meet has finalized the Docker-based systems infrastructure for the recommendation system,
+    including PostgreSQL, Redis, Airflow, FastAPI, Prometheus, Grafana, Kafka, and HDFS services
+    using Docker Compose.
+
+    Meet has configured and verified the Airflow skeleton DAG with a nightly schedule for the 
+    recommendation pipeline, establishing the orchestration structure for future ingestion, 
+    feature engineering, model training, and cache refresh tasks.
+
+    Meet has implemented and verified the FastAPI serving layer with health and root endpoints, 
+    along with a dummy `/recommendations/{user_id}` endpoint returning static recommendations 
+    as required for the Phase 1 milestone.
+
+14/09/2026  — 03:00 am
+    Meet has verified that the complete Docker Compose environment is running successfully and 
+    that the FastAPI recommendation endpoint is accessible through the API service.
