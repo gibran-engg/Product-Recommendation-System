@@ -18,6 +18,12 @@
     along with a dummy `/recommendations/{user_id}` endpoint returning static recommendations 
     as required for the Phase 1 milestone.
 
-14/09/2026  — 03:00 am
+14/09/2026 — 03:00 am
     Meet has verified that the complete Docker Compose environment is running successfully and 
     that the FastAPI recommendation endpoint is accessible through the API service.
+
+14/09/2026 — 01.30 pm
+    Implemented Redis integration with connection, recommendation storage, and retrieval methods,
+    and verified API ↔ Redis communication.
+    Updated FastAPI /recommendations/{user_id} to serve cached recommendations from Redis with 
+    proper 404 handling for users without cached data.
