@@ -1,7 +1,7 @@
 13/09/2026 12:00pm
-    Gibran has verified the required dataset, cleaned it with python script, written the json schema for the same, and set up docker 
+    Gibran has verified the required dataset, cleaned it with python script, written the json schema for the same, and set up docker
 13/09/2026 3:30pm
-    Gibran has established primary pipeline connection from kafka to hdfs using docker container, 
+    Gibran has established primary pipeline connection from kafka to hdfs using docker container,
     Analysed the 'cleaned_events.csv' under data\dataset\cleaned using exploratory data anaylsis in 'eda.ipynb' under notebooks\eda.ipynb
     Listed the findings in a markdown below the cells, need to collaborate and engineer additional features for the system.
 
@@ -10,20 +10,76 @@
     including PostgreSQL, Redis, Airflow, FastAPI, Prometheus, Grafana, Kafka, and HDFS services
     using Docker Compose.
 
-    Meet has configured and verified the Airflow skeleton DAG with a nightly schedule for the 
-    recommendation pipeline, establishing the orchestration structure for future ingestion, 
+    Meet has configured and verified the Airflow skeleton DAG with a nightly schedule for the
+    recommendation pipeline, establishing the orchestration structure for future ingestion,
     feature engineering, model training, and cache refresh tasks.
 
-    Meet has implemented and verified the FastAPI serving layer with health and root endpoints, 
-    along with a dummy `/recommendations/{user_id}` endpoint returning static recommendations 
+    Meet has implemented and verified the FastAPI serving layer with health and root endpoints,
+    along with a dummy `/recommendations/{user_id}` endpoint returning static recommendations
     as required for the Phase 1 milestone.
 
 14/09/2026 — 03:00 am
-    Meet has verified that the complete Docker Compose environment is running successfully and 
+    Meet has verified that the complete Docker Compose environment is running successfully and
     that the FastAPI recommendation endpoint is accessible through the API service.
 
 14/09/2026 — 01.30 pm
     Implemented Redis integration with connection, recommendation storage, and retrieval methods,
     and verified API ↔ Redis communication.
-    Updated FastAPI /recommendations/{user_id} to serve cached recommendations from Redis with 
+    Updated FastAPI /recommendations/{user_id} to serve cached recommendations from Redis with
     proper 404 handling for users without cached data.
+
+17/09/2026 — 05:45 pm
+    Gibran has tested the PySpark feature engineering job ('build_interaction_matrix.py') end to
+    end, applying the finalized event weighting (purchase=5, cart=3, view=1) and 14-day-half-life
+    time decay to a 10,000-event sample from 'cleaned_events.csv', matching the volume
+    'kafka_producer.py' streams per test run. The job correctly collapsed events into a
+    user-item interaction matrix — 7,028 unique (user, item) pairs across 2,868 users and 4,145
+    items, interaction_score range 1.0-22.0 — plus the item_features by-product
+    (popularity_score, conversion_rate). Note: the live Docker/Kafka/HDFS stack on this machine
+    wasn't reachable from this session, so the job's actual transformation code was imported and
+    run unmodified against a local stand-in for the HDFS input (no hdfs://namenode paths or
+    architecture touched) — this validates the logic, not the live Kafka-to-HDFS wiring, which
+    still needs a run inside the real stack to fully close out.
+
+    Trained the ALS model ('train_als_model.py') on that matrix (implicit feedback, rank=20,
+    maxIter=15) — prediction stats came out non-degenerate (min 0.0, max 0.71, avg 0.05, not the
+    identical-everywhere red flag the script checks for). Ran 'sanity_check.py' against 5 sampled
+    users with real interaction history: recommendation lists differed across all 5 (no
+    "identical for everyone" red flag), and 3 of 5 showed direct category overlap with the
+    user's actual browsing history, the other 2 flagged for manual review as the script intends.
+
+    Self-check against the Phase 2 milestone ("ALS model produces real recommendations for a
+    test user"): met on the Data+ML side. Flagging two things for the team: (1) some
+    recommendation lists lean on a few popular categories (e.g. electronics.smartphone) more
+    than expected — likely a sample-size artifact of the 10k-row/2.5-hour test slice rather than
+    a bug, worth re-checking once run against a larger slice; (2) 'nightly_retrain_dag.py' is
+    still the Phase 1 placeholder (tagged "phase-1", no real task wired) — the other half of the
+    Phase 2 milestone ("Airflow can trigger the pipeline end-to-end") is still open on the
+    Systems/Serving side.
+
+19/09/2026 — 02:00 am
+    Dataset re-cleaned with SQL -> data/dataset/cleaned/final_cleaned_dataset.csv (3,582,337 rows,
+    Oct 1-5 2019, no nulls). The old cleaned_events.csv and its results are invalid.
+
+    Removed duplicated/obsolete test code: processing/spark_jobs/local_test/, testing/,
+    data/raw/clean_raw_data.ipynb (superseded by the SQL cleaning), data/raw/csv_to_para.ipynb.
+
+    Feature engineering verified on the full new dataset against an independent pandas
+    implementation: 1,995,903 (user,item) pairs, exact match (max diff 3e-13); weights 1/3/5 and
+    14-day decay (0.820..1.0 across Oct 1-5) correct; popularity + conversion rate exact.
+    ALS on the full dataset: hold-out hit-rate@20 19.18% vs 12.58% popularity baseline (ALS better).
+    Known weaknesses for Phase 3: only 0.76% of the catalog is ever recommended, top item reaches
+    39% of users, 6.7% of recommended items were already interacted with (no recency filter).
+
+    Production path fixed and run end to end on the live Docker stack:
+    kafka_producer -> Kafka -> hdfs_writer -> HDFS -> build_interaction_matrix -> train_als_model
+    -> sanity_check -> push_recommendations_to_redis (new) -> Redis -> FastAPI (200 for a real
+    user, 404 for unknown). Fixes: producer pointed at the new CSV; hdfs_writer now flushes the
+    tail buffer when idle and commits Kafka offsets only after HDFS writes; spark_session uses
+    HDFS user root (writes were denied), datanode hostnames (host access) and UTC (decay was
+    timezone-dependent). Old-dataset events moved in HDFS to /archive/user_events_old_dataset_13092026.
+
+    OPEN (@Meet): nightly_retrain_dag.py now chains the 4 Spark jobs and docker-compose mounts
+    processing/ + serving/ into the airflow container, but the airflow image build
+    (Java 17 + pyspark 4.2.0) was not finished, so the DAG has NOT been run yet. To verify:
+    docker compose build airflow && docker compose up -d airflow, then trigger nightly_retrain.

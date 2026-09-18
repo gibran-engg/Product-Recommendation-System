@@ -1,6 +1,5 @@
 # Large datasets
-data/dataset/2019-Oct.csv
-data/dataset/cleaned/cleaned_events.csv
+data/dataset/
 
 # Environment variables / secrets
 .env
