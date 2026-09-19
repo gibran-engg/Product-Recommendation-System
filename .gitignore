@@ -1,4 +1,5 @@
 # Large datasets
+data/dataset/
 data/dataset/2019-Oct.csv
 data/dataset/cleaned/cleaned_events.csv
 
