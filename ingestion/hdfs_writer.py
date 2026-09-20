@@ -77,8 +77,6 @@ def flush_buffer(client: InsecureClient, buffer: list) -> None:
     if not buffer:
         return
 
-    df = pd.DataFrame(buffer)
-
     # Group by partition in case the buffer spans a date boundary
     grouped = defaultdict(list)
     for record in buffer:
@@ -112,7 +110,9 @@ def main():
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id=CONSUMER_GROUP_ID,
         auto_offset_reset="earliest",   # catch messages sent before this started
-        enable_auto_commit=True,
+        # Offsets are committed only after the events are safely in HDFS, so a
+        # crash re-delivers the unflushed buffer instead of silently losing it
+        enable_auto_commit=False,
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
     )
 
@@ -124,23 +124,28 @@ def main():
     logger.info(f"Listening on topic '{TOPIC_NAME}'... (Ctrl+C to stop)")
 
     try:
-        for message in consumer:
-            buffer.append(message.value)
+        while True:
+            # poll() returns even when the topic is idle, so the time-based
+            # flush still fires once the producer stops sending
+            for records in consumer.poll(timeout_ms=1000).values():
+                buffer.extend(record.value for record in records)
 
             time_since_flush = time.time() - last_flush_time
-            should_flush = (
+            should_flush = buffer and (
                 len(buffer) >= FLUSH_EVERY
                 or time_since_flush >= FLUSH_INTERVAL_SECONDS
             )
 
             if should_flush:
                 flush_buffer(hdfs_client, buffer)
+                consumer.commit()
                 buffer = []
                 last_flush_time = time.time()
 
     except KeyboardInterrupt:
         logger.info("Stopping consumer, flushing remaining buffer...")
         flush_buffer(hdfs_client, buffer)
+        consumer.commit()
 
     finally:
         consumer.close()

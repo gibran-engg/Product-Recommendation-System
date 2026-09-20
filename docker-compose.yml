@@ -97,14 +97,21 @@ services:
     container_name: airflow
     depends_on:
       - postgres
+      - namenode
+      - redis
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://admin:admin@postgres/recsys
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     ports:
       - "8080:8080"
     volumes:
       - ./orchestration/airflow/dags:/opt/airflow/dags
+      # the DAG runs the Spark jobs straight from the repo
+      - ./processing:/opt/airflow/project/processing
+      - ./serving:/opt/airflow/project/serving
 
   # ---------------------------------------------------------------
   # FastAPI — serving layer

@@ -12,6 +12,7 @@ Usage:
 import json
 import logging
 import time
+from pathlib import Path
 
 import pandas as pd
 from kafka import KafkaProducer
@@ -20,7 +21,7 @@ from kafka import KafkaProducer
 # Config — edit these
 # ---------------------------------------------------------------------------
 
-INPUT_CSV = r"D:\Product-Recommendation-System\data\dataset\cleaned\cleaned_events.csv"
+INPUT_CSV = Path(__file__).resolve().parents[1] / "data" / "dataset" / "cleaned" / "final_cleaned_dataset.csv"
 
 KAFKA_BOOTSTRAP_SERVERS = "localhost:29092"   # host-facing listener from docker-compose.yml
 TOPIC_NAME = "user_events"
