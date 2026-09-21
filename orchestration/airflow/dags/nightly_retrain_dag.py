@@ -10,7 +10,11 @@ SPARK_JOBS = "/opt/airflow/project/processing/spark_jobs"
 def spark_job(script: str) -> BashOperator:
     return BashOperator(
         task_id=script.removesuffix(".py"),
-        bash_command=f"python {SPARK_JOBS}/{script}",
+        bash_command=(
+            f"PYTHONPATH=/opt/airflow/project/processing:"
+            f"/opt/airflow/project/serving "
+            f"spark-submit {SPARK_JOBS}/{script}"
+        ),
     )
 
 

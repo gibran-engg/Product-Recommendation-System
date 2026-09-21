@@ -55,7 +55,11 @@ services:
     depends_on:
       - namenode
     environment:
-      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      -  CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      -  HDFS_CONF_dfs_datanode_http_address=0.0.0.0:9864
+      -  HDFS_CONF_dfs_datanode_address=0.0.0.0:9866
+      -  HDFS_CONF_dfs_datanode_hostname=host.docker.internal
+
     ports:
       - "9864:9864"   # DataNode web UI — WebHDFS redirects land here
       - "9866:9866"   # DataNode data transfer (raw RPC, not used by WebHDFS but harmless to expose)
