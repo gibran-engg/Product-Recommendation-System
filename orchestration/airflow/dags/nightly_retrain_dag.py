@@ -13,7 +13,10 @@ def spark_job(script: str) -> BashOperator:
         bash_command=(
             f"PYTHONPATH=/opt/airflow/project/processing:"
             f"/opt/airflow/project/serving "
-            f"spark-submit {SPARK_JOBS}/{script}"
+            f"spark-submit "
+            f"--conf spark.hadoop.fs.defaultFS=hdfs://namenode:8020 "
+            f"--conf spark.hadoop.dfs.client.use.datanode.hostname=false "
+            f"{SPARK_JOBS}/{script}"
         ),
     )
 

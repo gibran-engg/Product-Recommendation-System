@@ -109,6 +109,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      HADOOP_CONF_DIR: /opt/spark/conf
     ports:
       - "8080:8080"
     volumes:
@@ -116,6 +117,9 @@ services:
       # the DAG runs the Spark jobs straight from the repo
       - ./processing:/opt/airflow/project/processing
       - ./serving:/opt/airflow/project/serving
+      - ./orchestration/airflow/hadoop/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ./orchestration/airflow/hadoop/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
+      - ./orchestration/airflow/hadoop/spark-env.sh:/opt/spark/conf/spark-env.sh:ro
 
   # ---------------------------------------------------------------
   # FastAPI — serving layer

@@ -1,0 +1,7 @@
+﻿<?xml version="1.0"?>
+<configuration>
+    <property>
+        <name>dfs.client.use.datanode.hostname</name>
+        <value>false</value>
+    </property>
+</configuration>
