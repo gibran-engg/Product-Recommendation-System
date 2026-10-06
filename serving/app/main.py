@@ -1,13 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
-from app.services.redis_client import RedisClient
+from app.routes.recommendations import router as recommendations_router
+
 
 app = FastAPI(
     title="Product Recommendation System API",
     version="0.2.0",
 )
-
-redis_client = RedisClient()
 
 
 @app.get("/")
@@ -25,17 +24,4 @@ def health():
     }
 
 
-@app.get("/recommendations/{user_id}")
-def get_recommendations(user_id: str):
-    recommendations = redis_client.get_recommendations(user_id)
-
-    if recommendations is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No recommendations found for user {user_id}",
-        )
-
-    return {
-        "user_id": user_id,
-        "recommendations": recommendations,
-    }
+app.include_router(recommendations_router)

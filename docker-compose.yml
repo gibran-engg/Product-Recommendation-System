@@ -31,6 +31,45 @@ services:
       - "9092:9092"
       - "29092:29092"
 
+
+    # ---------------------------------------------------------------
+  # Kafka Producer — streams cleaned dataset events into Kafka
+  # ---------------------------------------------------------------
+  producer:
+    build:
+      context: .
+      dockerfile: ingestion/docker/producer.Dockerfile
+    container_name: recommendation-producer
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: user_events
+      DATASET_PATH: /app/data/final_cleaned_dataset.csv
+      SAMPLE_SIZE: "10000"
+      DELAY_SECONDS: "0.01"
+    volumes:
+      - ./data/dataset/cleaned:/app/data:ro
+
+
+  hdfs-writer:
+    build:
+      context: .
+      dockerfile: ingestion/docker/hdfs-writer.Dockerfile
+    container_name: recommendation-hdfs-writer
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - namenode
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: user_events
+      KAFKA_CONSUMER_GROUP: hdfs-writer-group
+      HDFS_WEBHDFS_URL: http://namenode:9870
+      HDFS_USER: root
+      HDFS_BASE_PATH: /data/raw/user_events
+      FLUSH_EVERY: "500"
+      FLUSH_INTERVAL_SECONDS: "30"
   # ---------------------------------------------------------------
   # HDFS — data lake for raw event storage
   # ---------------------------------------------------------------

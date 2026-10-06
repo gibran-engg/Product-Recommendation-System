@@ -11,6 +11,7 @@ Usage:
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -21,13 +22,28 @@ from kafka import KafkaProducer
 # Config — edit these
 # ---------------------------------------------------------------------------
 
-INPUT_CSV = Path(__file__).resolve().parents[1] / "data" / "dataset" / "cleaned" / "final_cleaned_dataset.csv"
+INPUT_CSV = Path(
+    os.getenv(
+        "DATASET_PATH",
+        str(
+            Path(__file__).resolve().parents[1]
+            / "data"
+            / "dataset"
+            / "cleaned"
+            / "final_cleaned_dataset.csv"
+        ),
+    )
+)
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:29092"   # host-facing listener from docker-compose.yml
-TOPIC_NAME = "user_events"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv(
+    "KAFKA_BOOTSTRAP_SERVERS",
+    "localhost:29092",
+)
 
-SAMPLE_SIZE = 10_000        # how many rows to stream for this test run
-DELAY_SECONDS = 0.01        # small delay between sends to simulate real traffic
+TOPIC_NAME = os.getenv("KAFKA_TOPIC", "user_events")
+
+SAMPLE_SIZE = int(os.getenv("SAMPLE_SIZE", "10000"))
+DELAY_SECONDS = float(os.getenv("DELAY_SECONDS", "0.01"))
 
 # ---------------------------------------------------------------------------
 # Logging

@@ -17,6 +17,7 @@ Usage:
 import io
 import json
 import logging
+import os
 import time
 import uuid
 from datetime import datetime
@@ -29,18 +30,40 @@ from hdfs import InsecureClient
 # ---------------------------------------------------------------------------
 # Config — edit these
 # ---------------------------------------------------------------------------
+KAFKA_BOOTSTRAP_SERVERS = os.getenv(
+    "KAFKA_BOOTSTRAP_SERVERS",
+    "localhost:29092",
+)
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:29092"
-TOPIC_NAME = "user_events"
-CONSUMER_GROUP_ID = "hdfs-writer-group"
+TOPIC_NAME = os.getenv(
+    "KAFKA_TOPIC",
+    "user_events",
+)
 
-HDFS_WEBHDFS_URL = "http://localhost:9870"   # NameNode web UI / WebHDFS port
-HDFS_USER = "root"
-HDFS_BASE_PATH = "/data/raw/user_events"
+CONSUMER_GROUP_ID = os.getenv(
+    "KAFKA_CONSUMER_GROUP",
+    "hdfs-writer-group",
+)
 
-FLUSH_EVERY = 500            # events
-FLUSH_INTERVAL_SECONDS = 30  # seconds
+HDFS_WEBHDFS_URL = os.getenv(
+    "HDFS_WEBHDFS_URL",
+    "http://localhost:9870",
+)
 
+HDFS_USER = os.getenv(
+    "HDFS_USER",
+    "root",
+)
+
+HDFS_BASE_PATH = os.getenv(
+    "HDFS_BASE_PATH",
+    "/data/raw/user_events",
+)
+
+FLUSH_EVERY = int(os.getenv("FLUSH_EVERY", "500"))
+FLUSH_INTERVAL_SECONDS = int(
+    os.getenv("FLUSH_INTERVAL_SECONDS", "30")
+)
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
