@@ -11,6 +11,9 @@ def spark_job(script: str) -> BashOperator:
     return BashOperator(
         task_id=script.removesuffix(".py"),
         bash_command=(
+            # spark-submit starts the JVM before the job's Python runs, so the HDFS
+            # identity set in spark_session.py comes too late — set it here instead
+            f"HADOOP_USER_NAME=root "
             f"PYTHONPATH=/opt/airflow/project/processing:"
             f"/opt/airflow/project/serving "
             f"spark-submit "

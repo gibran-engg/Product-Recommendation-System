@@ -83,3 +83,36 @@
     processing/ + serving/ into the airflow container, but the airflow image build
     (Java 17 + pyspark 4.2.0) was not finished, so the DAG has NOT been run yet. To verify:
     docker compose build airflow && docker compose up -d airflow, then trigger nightly_retrain.
+
+11/10/2026
+    Phase 3 (Data+ML) built and run on the live stack, inside the airflow container:
+    - train_content_based.py: TF-IDF over item metadata (category_code prefixes, category_id,
+      brand) for cold-start users (<= 3 events). Cosine similarity to the user's profile over
+      the top 2,000 popular items, already-seen items excluded, max 3 items per brand
+      (otherwise every smartphone viewer got 10 identical-score Samsungs), popularity backfill.
+      Output: /data/processed/content_based_recommendations (same schema as ALS top-N),
+      /data/processed/item_tfidf. 1,782 cold-start users covered.
+    - cold_start_sanity_check.py: prints history vs recommendations (category/brand) for 5
+      cold-start users — 5/5 got recommendations in a category from their history.
+    - evaluate_model.py: Precision/Recall/hit-rate@K and coverage on an 80/20 hold-out
+      (own ALS trained on the 80%). Output: /data/processed/evaluation_metrics.
+      Results on the 10k-event slice (761 evaluable users, 495 cold-start), K=10:
+          all users:   ALS hit 11.6% / recall 9.0% / coverage 8.1%
+                       popularity hit 10.2% / recall 8.0% / coverage 0.5%
+          cold-start:  TF-IDF hit 20.0% / recall 17.1% / coverage 30.5%
+                       ALS hit 10.9%, popularity hit 10.1%
+      TF-IDF ~2x popularity/ALS for cold-start. ALS vs popularity on all users is within noise
+      on this tiny slice — re-run on a larger slice before quoting.
+
+    Pipeline fixes:
+    - nightly_retrain (@Meet, your file): DAG failed writing to HDFS as user "airflow" —
+      spark-submit starts the JVM before the job's Python, so spark_session.py's
+      HADOOP_USER_NAME comes too late. Added HADOOP_USER_NAME=root to the bash_command.
+      DAG was also paused (runs stuck "queued"); unpaused. Full run now succeeds:
+      10,000 events -> 7,011 pairs -> ALS -> 2,485 users in Redis -> API 200 (20 recs).
+    - HDFS held the same 10k events 3x (producer always re-sends the first SAMPLE_SIZE rows).
+      Moved the 2 older copies to /archive/user_events_dup_11102026. Don't re-run the producer
+      until it is made idempotent.
+
+    OPEN: push_recommendations_to_redis.py still pushes ALS only — route cold-start users to the
+    content-based output. New jobs are not in the DAG yet (@Meet).
