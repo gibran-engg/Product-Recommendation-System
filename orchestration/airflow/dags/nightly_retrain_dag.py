@@ -1,17 +1,18 @@
 
+import os
 from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
 # Job order and launch command are shared with run.py (repo root)
-from pipeline_jobs import PIPELINE_JOBS, spark_submit_command
+from pipeline_jobs import DEFAULT_DRIVER_MEMORY, PIPELINE_JOBS, spark_submit_command
 
 
 def spark_job(script: str) -> BashOperator:
     return BashOperator(
         task_id=script.removesuffix(".py"),
-        bash_command=spark_submit_command(script),
+        bash_command=spark_submit_command(script, os.getenv("SPARK_DRIVER_MEMORY", DEFAULT_DRIVER_MEMORY)),
     )
 
 

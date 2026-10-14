@@ -26,13 +26,22 @@ PIPELINE_JOBS = [
 ]
 
 
-def spark_submit_command(script: str) -> str:
+# Spark runs in local mode, so the driver JVM does all the work and its heap is
+# the job's whole memory budget. spark-submit's default is 1g no matter how much
+# RAM is free, which is too little past ~100k events (the 500k-event TF-IDF job
+# spilled to disk and the Docker VM ran out of memory). Override with
+# run.py --spark-memory or SPARK_DRIVER_MEMORY.
+DEFAULT_DRIVER_MEMORY = "2g"
+
+
+def spark_submit_command(script: str, driver_memory: str = DEFAULT_DRIVER_MEMORY) -> str:
     # spark-submit starts the JVM before the job's Python runs, so the HDFS
     # identity set in spark_session.py comes too late — set it here instead
     return (
         f"HADOOP_USER_NAME=root "
         f"PYTHONPATH={PROJECT_DIR}/processing:{PROJECT_DIR}/serving "
         f"spark-submit "
+        f"--driver-memory {driver_memory} "
         f"--conf spark.hadoop.fs.defaultFS=hdfs://namenode:8020 "
         f"--conf spark.hadoop.dfs.client.use.datanode.hostname=false "
         f"{SPARK_JOBS_DIR}/{script}"

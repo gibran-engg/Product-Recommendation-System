@@ -35,7 +35,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "orchestration" / "airflow" / "dags"))
-from pipeline_jobs import PIPELINE_JOBS, spark_submit_command  # noqa: E402
+from pipeline_jobs import DEFAULT_DRIVER_MEMORY, PIPELINE_JOBS, spark_submit_command  # noqa: E402
 
 DATASET = ROOT / "data" / "dataset" / "cleaned" / "final_cleaned_dataset.csv"
 DATASET_ZIP = DATASET.with_suffix(".zip")
@@ -109,20 +109,28 @@ def exec_ok(container: str, *cmd: str) -> bool:
     return sh(["docker", "exec", container, *cmd], check=False, capture=True).returncode == 0
 
 
+def docker_responds() -> bool:
+    """`docker info` hangs (instead of failing) when the Docker VM is wedged, e.g. out of memory."""
+    try:
+        return subprocess.run(["docker", "info"], capture_output=True, timeout=20).returncode == 0
+    except subprocess.TimeoutExpired:
+        return False
+
+
 # --------------------------------------------------------------------------- steps
 
 def preflight() -> None:
     step("Preflight")
     if not shutil.which("docker"):
         raise StepFailed("Docker is not installed or not on PATH — install Docker Desktop first.")
-    if sh(["docker", "info"], check=False, capture=True).returncode != 0:
+    if not docker_responds():
         desktop = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe"
         if os.name == "nt" and desktop.exists():
             info("Docker engine is not running — starting Docker Desktop...")
             subprocess.Popen([str(desktop)])
-            wait_for("Docker engine is up", lambda: sh(["docker", "info"], check=False, capture=True).returncode == 0, timeout=240, interval=5)
+            wait_for("Docker engine is up", docker_responds, timeout=240, interval=5)
         else:
-            raise StepFailed("Docker engine is not running — start Docker and re-run.")
+            raise StepFailed("Docker engine is not responding — restart Docker Desktop and re-run.")
     else:
         ok("Docker engine is up")
 
@@ -199,7 +207,7 @@ def start_airflow() -> None:
              lambda: exec_ok("airflow", "bash", "-c", "command -v spark-submit"), timeout=300)
 
 
-def run_pipeline(start_from: str | None = None, only: str | None = None) -> None:
+def run_pipeline(start_from: str | None = None, only: str | None = None, memory: str = DEFAULT_DRIVER_MEMORY) -> None:
     jobs = PIPELINE_JOBS
     for name in filter(None, [start_from, only]):
         if name not in jobs:
@@ -210,9 +218,9 @@ def run_pipeline(start_from: str | None = None, only: str | None = None) -> None
         jobs = jobs[jobs.index(start_from):]
 
     for i, job in enumerate(jobs, 1):
-        step(f"Spark job {i}/{len(jobs)}: {job}")
+        step(f"Spark job {i}/{len(jobs)}: {job}  {DIM}(driver memory {memory}){RESET}")
         t0 = time.time()
-        proc = sh(["docker", "exec", "airflow", "bash", "-c", spark_submit_command(job)], check=False, stream=True)
+        proc = sh(["docker", "exec", "airflow", "bash", "-c", spark_submit_command(job, memory)], check=False, stream=True)
         if proc.returncode != 0:
             raise StepFailed(f"{job} failed (exit {proc.returncode}). Fix it, then resume with:\n"
                              f"    python run.py pipeline --from {job}")
@@ -262,10 +270,13 @@ def main() -> None:
         p.add_argument("--sample-size", type=int, default=10_000, help="events to stream when ingesting (default 10000)")
         p.add_argument("--skip-pipeline", action="store_true", help="don't run the Spark jobs")
         p.add_argument("--no-browser", action="store_true", help="don't open the storefront")
+        p.add_argument("--spark-memory", default=DEFAULT_DRIVER_MEMORY,
+                       help=f"Spark driver memory, e.g. 2g or 3g (default {DEFAULT_DRIVER_MEMORY}); raise it for big samples")
 
     pipe = sub.add_parser("pipeline", help="run the Spark jobs only")
     pipe.add_argument("--from", dest="start_from", metavar="JOB", help="resume from this job, e.g. evaluate_model.py")
     pipe.add_argument("--only", metavar="JOB", help="run a single job")
+    pipe.add_argument("--spark-memory", default=DEFAULT_DRIVER_MEMORY, help=f"Spark driver memory (default {DEFAULT_DRIVER_MEMORY})")
 
     srv = sub.add_parser("serve", help="(re)start the API + storefront only")
     srv.add_argument("--no-browser", action="store_true")
@@ -283,12 +294,12 @@ def main() -> None:
                 ingest(args.reingest, args.sample_size)
             if not args.skip_pipeline:
                 start_airflow()
-                run_pipeline()
+                run_pipeline(memory=args.spark_memory)
             serve(not args.no_browser)
         elif command == "pipeline":
             preflight()
             start_airflow()
-            run_pipeline(args.start_from, args.only)
+            run_pipeline(args.start_from, args.only, args.spark_memory)
         elif command == "serve":
             serve(not args.no_browser)
         elif command == "status":
