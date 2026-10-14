@@ -27,6 +27,13 @@ TOP_N_OUTPUT_PATH = "hdfs://namenode:8020/data/processed/top_n_recommendations"
 
 TOP_N = 20
 
+ALS_PARAMS = {
+    "implicitPrefs": True,   # critical: treats scores as confidence, not ratings
+    "rank": 20,              # number of latent factors — tune later if needed
+    "maxIter": 15,
+    "regParam": 0.1,
+}
+
 
 def load_interaction_matrix(spark):
     logger.info(f"Reading interaction matrix from {INTERACTION_MATRIX_PATH}")
@@ -47,10 +54,7 @@ def train_als(train_df):
         userCol="user_id",
         itemCol="item_id",
         ratingCol="interaction_score",
-        implicitPrefs=True,       # critical: treats scores as confidence, not ratings
-        rank=20,                  # number of latent factors — tune later if needed
-        maxIter=15,
-        regParam=0.1,
+        **ALS_PARAMS,
         coldStartStrategy="drop", # drop NaN predictions for unseen users/items in eval
         nonnegative=True,         # interaction scores are non-negative, keep factors consistent
     )

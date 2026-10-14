@@ -46,7 +46,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: user_events
       DATASET_PATH: /app/data/final_cleaned_dataset.csv
-      SAMPLE_SIZE: "10000"
+      SAMPLE_SIZE: "${SAMPLE_SIZE:-10000}"   # run.py --sample-size overrides it
       DELAY_SECONDS: "0.01"
     volumes:
       - ./data/dataset/cleaned:/app/data:ro
@@ -175,6 +175,9 @@ services:
       POSTGRES_DSN: postgresql://admin:admin@postgres:5432/recsys
     ports:
       - "8000:8000"
+    volumes:
+      # storefront UI edits show up on refresh, no image rebuild
+      - ./serving/web:/app/web:ro
 
   # ---------------------------------------------------------------
   # Monitoring — Prometheus + Grafana

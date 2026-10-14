@@ -1,26 +1,17 @@
+
 from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 
-# processing/ and serving/ are mounted here by docker-compose.yml
-SPARK_JOBS = "/opt/airflow/project/processing/spark_jobs"
+# Job order and launch command are shared with run.py (repo root)
+from pipeline_jobs import PIPELINE_JOBS, spark_submit_command
 
 
 def spark_job(script: str) -> BashOperator:
     return BashOperator(
         task_id=script.removesuffix(".py"),
-        bash_command=(
-            # spark-submit starts the JVM before the job's Python runs, so the HDFS
-            # identity set in spark_session.py comes too late — set it here instead
-            f"HADOOP_USER_NAME=root "
-            f"PYTHONPATH=/opt/airflow/project/processing:"
-            f"/opt/airflow/project/serving "
-            f"spark-submit "
-            f"--conf spark.hadoop.fs.defaultFS=hdfs://namenode:8020 "
-            f"--conf spark.hadoop.dfs.client.use.datanode.hostname=false "
-            f"{SPARK_JOBS}/{script}"
-        ),
+        bash_command=spark_submit_command(script),
     )
 
 
@@ -29,12 +20,9 @@ with DAG(
     start_date=datetime(2026, 1, 1),
     schedule="0 2 * * *",
     catchup=False,
-    tags=["recommendation-system", "phase-2"],
+    tags=["recommendation-system", "phase-3"],
 ) as dag:
 
-    (
-        spark_job("build_interaction_matrix.py")
-        >> spark_job("train_als_model.py")
-        >> spark_job("sanity_check.py")
-        >> spark_job("push_recommendations_to_redis.py")
-    )
+    tasks = [spark_job(script) for script in PIPELINE_JOBS]
+    for upstream, downstream in zip(tasks, tasks[1:]):
+        upstream >> downstream
