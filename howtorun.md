@@ -3,6 +3,31 @@
 Run every command from the project folder in PowerShell:
 D:\Product-Recommendation-System
 
+> **REQUIRED before anything else:** the dataset isn't in the repo. Download
+> **final_cleaned_dataset.zip** from Google Drive and save it to **data\dataset\cleaned\**
+> (create the folder if it doesn't exist). Without it, Step 2 warns "No dataset at ..." and, on a fresh setup, stops with
+> "HDFS has no events and the dataset is missing".
+
+---
+
+## First time only: get the dataset (~2 min)
+
+1. Download **final_cleaned_dataset.zip** (124.8 MB) from Google Drive:
+   https://drive.google.com/drive/folders/1uKE-HfPv1vSxd_OPe9PVxIGmw_ZPh6_f?usp=sharing
+
+   Or from the terminal:
+
+   pip install gdown
+   mkdir data\dataset\cleaned
+   gdown 1mrZ3BxRDBfTbROr7vmP12MjjnuCIQiMT -O data/dataset/cleaned/final_cleaned_dataset.zip
+
+2. Put it, still zipped, in `data\dataset\cleaned\`. `run.py` extracts it the first time it runs.
+
+   ✅ Step 2 prints "✓ Dataset found".
+
+Data: [eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store) (Kaggle, Michael Kechinov), provided by the
+[REES46 Marketing Platform](https://rees46.com/). Free to use with attribution; see Acknowledgements in README.md.
+
 ---
 
 ## Step 0: Prepare the laptop (2 min)

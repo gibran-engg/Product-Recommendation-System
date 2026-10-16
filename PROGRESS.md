@@ -175,3 +175,8 @@ Two config bugs fixed:
 - experimentation/logger.py imports psycopg (v3) but requirements.txt and serving/requirements.txt listed
   psycopg2-binary, so the logger would fail on import once wired in. Both now list psycopg[binary]>=3.1;
   verified it imports in the rebuilt API image (psycopg 3.3.6). Airflow's own psycopg2 connection is unchanged.
+
+Dataset hosting: the cleaned dataset (final_cleaned_dataset.zip, 124.8 MB) is shared on Google Drive and linked from
+README.md (Data → Getting the data) and howtorun.md (First time only), with a gdown command. It isn't in git:
+GitHub rejects files over 100 MB. Added an Acknowledgements section citing the Kaggle dataset (Michael Kechinov)
+and the REES46 Marketing Platform, as the dataset page asks.

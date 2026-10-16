@@ -6,6 +6,12 @@ an **ALS** collaborative-filtering model and a **TF-IDF** cold-start model, then
 in **Redis** and served by a **FastAPI** hybrid re-ranker that adapts to the live session. **Airflow** orchestrates the batch
 pipeline, and a demo storefront with a debug panel shows why every item is recommended.
 
+> [!IMPORTANT]
+> **Download the dataset first.** It isn't in the repo (it's too big for GitHub). Download
+> **[final_cleaned_dataset.zip](https://drive.google.com/drive/folders/1uKE-HfPv1vSxd_OPe9PVxIGmw_ZPh6_f?usp=sharing)** from Google Drive and save it, still zipped, to
+> **`data/dataset/cleaned/`**, creating the folder if needed. On a fresh setup `run.py` stops at ingestion without it.
+> Details: [Getting the data](#getting-the-data).
+
 ```bash
 python run.py        # brings the whole system up, in order, and opens the storefront
 ```
@@ -36,6 +42,7 @@ Built by a team of two working in parallel tracks against one frozen event schem
 11. [Testing](#11-testing)
 12. [Troubleshooting](#12-troubleshooting)
 13. [Known limitations & roadmap](#13-known-limitations--roadmap)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -43,26 +50,26 @@ Built by a team of two working in parallel tracks against one frozen event schem
 
 ```mermaid
 flowchart LR
-    CSV[(Cleaned dataset<br/>3.58M events)] --> P[Kafka producer]
-    P --> K[Kafka<br/>topic user_events]
-    K --> W[hdfs-writer]
-    W --> H[(HDFS<br/>year/month/day parquet)]
+    CSV[("Cleaned dataset<br/>3.58M events")] --> P["Kafka producer"]
+    P --> K["Kafka<br/>topic user_events"]
+    K --> W["hdfs-writer"]
+    W --> H[("HDFS<br/>year/month/day parquet")]
 
     subgraph Batch["Batch layer: Spark, orchestrated by Airflow (nightly_retrain)"]
-        H --> FE[build_interaction_matrix<br/>weights + 14-day decay]
-        FE --> ALS[train_als_model<br/>implicit ALS]
-        ALS --> SC[sanity_check]
-        SC --> CB[train_content_based<br/>TF-IDF cold-start]
-        CB --> CSC[cold_start_sanity_check]
-        CSC --> EV[evaluate_model<br/>P/R/hit-rate@K, coverage]
-        EV --> PR[push_recommendations_to_redis]
-        PR --> EX[export_serving_features]
+        H --> FE["build_interaction_matrix<br/>weights + 14-day decay"]
+        FE --> ALS["train_als_model<br/>implicit ALS"]
+        ALS --> SC["sanity_check"]
+        SC --> CB["train_content_based<br/>TF-IDF cold-start"]
+        CB --> CSC["cold_start_sanity_check"]
+        CSC --> EV["evaluate_model<br/>P/R/hit-rate at K, coverage"]
+        EV --> PR["push_recommendations_to_redis"]
+        PR --> EX["export_serving_features"]
     end
 
-    PR --> R[(Redis)]
+    PR --> R[("Redis")]
     EX --> R
-    R --> API[FastAPI<br/>hybrid re-ranker]
-    UI[Storefront + debug panel] <-->|clicks = session events| API
+    R --> API["FastAPI<br/>hybrid re-ranker"]
+    UI["Storefront + debug panel"] <-->|"clicks = session events"| API
 ```
 
 **Lambda-style split.** The **batch layer** (Spark) does the heavy lifting once per run: features, models,
@@ -90,8 +97,9 @@ For a guided first run with expected output at each step, follow [howtorun.md](h
 
 - **Docker Desktop**, with about 8 GB RAM allocated
 - **Python 3.10+** on the host. `run.py` uses only the standard library, so no `pip install` is needed.
-- The cleaned dataset at `data/dataset/cleaned/final_cleaned_dataset.csv`. If only `final_cleaned_dataset.zip` is
-  there, `run.py` extracts it. The `data/dataset/` folder is git-ignored because the file is about 500 MB.
+- The cleaned dataset. Download `final_cleaned_dataset.zip` (125 MB) from [Google Drive](https://drive.google.com/drive/folders/1uKE-HfPv1vSxd_OPe9PVxIGmw_ZPh6_f?usp=sharing) and put it in
+  `data/dataset/cleaned/`; `run.py` extracts it on first run. The `data/dataset/` folder is git-ignored because the
+  extracted CSV is about 500 MB. See [Getting the data](#getting-the-data).
 
 ### One command
 
@@ -192,7 +200,30 @@ Each event shows a toast such as *"re-ranked 76 candidates in 53 ms · 7 positio
 
 ## 4. Data
 
-**Source:** [REES46 eCommerce behavior data](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store), October 2019.
+**Source:** [eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store) by Michael Kechinov on Kaggle,
+provided by the [REES46 Marketing Platform](https://rees46.com/) and collected by the Open CDP project. This project uses the
+first five days of October 2019. See [Acknowledgements](#acknowledgements).
+
+### Getting the data
+
+The cleaned file used here is shared on Google Drive: **[final_cleaned_dataset.zip](https://drive.google.com/drive/folders/1uKE-HfPv1vSxd_OPe9PVxIGmw_ZPh6_f?usp=sharing)** (124.8 MB, 3,582,337 rows).
+
+1. Download it from the link, or from the command line with [`gdown`](https://github.com/wkentaro/gdown), which handles
+   Drive's large-file confirmation page:
+
+   ```bash
+   pip install gdown
+   mkdir -p data/dataset/cleaned
+   gdown 1mrZ3BxRDBfTbROr7vmP12MjjnuCIQiMT -O data/dataset/cleaned/final_cleaned_dataset.zip
+   ```
+
+2. Leave it zipped in `data/dataset/cleaned/`. `run.py` extracts `final_cleaned_dataset.csv` on first run.
+
+To rebuild from scratch instead, download `2019-Oct.csv` from the [Kaggle page](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store) and apply the cleaning
+rules below. Kaggle's columns are renamed: `event_time` → `timestamp`, `product_id` → `item_id`,
+`user_session` → `session_id`.
+
+### Cleaning and schema
 
 **Cleaning** (SQL, see `PROGRESS.md`): the result is `final_cleaned_dataset.csv` with 3,582,337 rows (Oct 1–5 2019), no nulls in required
 fields, `price > 0`, and `event_type ∈ {view, cart, purchase, remove_from_cart}`. The contract is in `data/schema.json`:
@@ -494,3 +525,14 @@ SparkSession fixture in `tests/conftest.py` and are skipped if PySpark isn't ins
 3. Prometheus metrics on the API (latency, Redis hit rate) and a Grafana dashboard.
 4. Learn the re-ranker weights from logged clicks instead of hand-setting them.
 5. Make ingestion idempotent (event ids or offset-based slicing) and evaluate on the full 3.58M events.
+
+---
+
+## Acknowledgements
+
+The data comes from the [eCommerce behavior data from multi category store](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store) dataset published on Kaggle by
+Michael Kechinov. Thanks to the [REES46 Marketing Platform](https://rees46.com/) for making it available; it was collected by the
+Open CDP project. The dataset is free to use with attribution to the Kaggle page and REES46 (licence: data files
+© original authors). The cleaned copy linked above is a derived subset (Oct 1–5 2019, nulls and invalid rows
+removed) shared for reproducibility; all rights to the underlying data remain with the original authors.
+
