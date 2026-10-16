@@ -27,3 +27,7 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Logs
+progress.txt
+bughdfs.txt

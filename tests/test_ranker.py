@@ -92,14 +92,17 @@ def test_price_fit():
     assert double == pytest.approx(0.5)
 
 
-def test_als_is_scaled_to_best_candidate():
+def test_als_is_clipped_not_scaled_to_best_candidate():
     user = {"factors": [1.0, 1.0]}
-    items = [(make_item(1, factors=[0.2, 0.2]), "als"), (make_item(2, factors=[0.1, 0.1]), "als")]
-    results = ranker.rank(ranker.RankingContext(user, [], None), items, 2)
+    items = [(make_item(1, factors=[0.2, 0.2]), "als"), (make_item(2, factors=[0.1, 0.1]), "als"),
+             (make_item(3, factors=[0.8, 0.8]), "als")]
+    results = ranker.rank(ranker.RankingContext(user, [], None), items, 3)
     als = {r["item"]["item_id"]: next(f["value"] for f in r["factors"] if f["key"] == "als") for r in results}
-    assert als[1] == pytest.approx(1.0)
-    assert als[2] == pytest.approx(0.5)
-    assert results[0]["als_prediction"] == pytest.approx(0.4)
+    # a weak best match keeps its raw value instead of being inflated to 1.0
+    assert als[1] == pytest.approx(0.4)
+    assert als[2] == pytest.approx(0.2)
+    assert als[3] == pytest.approx(1.0)  # raw 1.6 is clipped
+    assert results[0]["als_prediction"] == pytest.approx(1.6)
 
 
 def test_guest_without_history_gets_zero_personal_factors():

@@ -19,9 +19,11 @@ const store = {
 
 const newGuestId = () => `guest-${Math.random().toString(36).slice(2, 8)}`;
 
+const cartKey = (userId) => `cart:${userId}`;
+
 const state = {
   userId: store.get("userId", null) || newGuestId(),
-  cart: store.get("cart", []),
+  cart: [],
   debugOpen: store.get("debugOpen", window.innerWidth > 1100),
   tab: "item",
   demoUsers: [],
@@ -31,6 +33,7 @@ const state = {
   userDetail: null,
 };
 store.set("userId", state.userId);
+state.cart = store.get(cartKey(state.userId), []);
 
 async function api(path, options = {}) {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
@@ -154,7 +157,7 @@ async function sendEvent(itemId, eventType) {
 async function addToCart(item) {
   if (!state.cart.some((i) => i.item_id === item.item_id)) {
     state.cart.push(item);
-    store.set("cart", state.cart);
+    store.set(cartKey(state.userId), state.cart);
   }
   updateCartCount();
   await sendEvent(item.item_id, "cart");
@@ -316,7 +319,7 @@ async function pageCart() {
   $$("[data-remove]", main).forEach((btn) => btn.addEventListener("click", async () => {
     const id = Number(btn.dataset.remove);
     state.cart = state.cart.filter((i) => i.item_id !== id);
-    store.set("cart", state.cart);
+    store.set(cartKey(state.userId), state.cart);
     updateCartCount();
     await sendEvent(id, "remove_from_cart");
     pageCart();
@@ -326,7 +329,7 @@ async function pageCart() {
     for (const item of state.cart) await sendEvent(item.item_id, "purchase");
     const n = state.cart.length;
     state.cart = [];
-    store.set("cart", state.cart);
+    store.set(cartKey(state.userId), state.cart);
     updateCartCount();
     toast(`Order placed (demo): logged <b>${n}</b> purchase events to your session`);
     location.hash = "#/";
@@ -524,7 +527,7 @@ function debugItemTab() {
     <div class="d-card">
       ${dItem(rec.item, `<div class="d-score"><small>Match Score</small><b>${Math.round(rec.score * 100)}%</b></div>`)}
       <div class="d-rows">
-        ${factors.map((f) => `<div class="d-row" data-tip="weight ${pct(f.weight, 0)} → adds ${(f.weight * f.value).toFixed(3)} to the final score${f.key === "als" && rec.als_prediction != null ? `<br>raw ALS prediction ${rec.als_prediction} (scaled to the best candidate)` : ""}">
+        ${factors.map((f) => `<div class="d-row" data-tip="weight ${pct(f.weight, 0)} → adds ${(f.weight * f.value).toFixed(3)} to the final score${f.key === "als" && rec.als_prediction != null ? `<br>raw ALS prediction ${rec.als_prediction} (clipped to 0–1)` : ""}">
           <span>${esc(f.label)}<span class="w">×${f.weight}</span></span><b>${f.value.toFixed(3)}</b></div>`).join("")}
         <div class="d-row final"><span>Final Score</span><b>${rec.score.toFixed(3)}</b></div>
         ${rec.variety && rec.variety.multiplier < 1 ? `<div class="d-row" data-tip="Variety pass: each earlier pick from the same category multiplies the ranking score by ${context ? 0.6 : 0.75}. Match % stays the raw score.">
@@ -666,6 +669,8 @@ function toggleAccountMenu(open) {
 function switchUser(userId) {
   state.userId = String(userId);
   store.set("userId", state.userId);
+  state.cart = store.get(cartKey(state.userId), []);
+  updateCartCount();
   state.userDetail = null;
   toggleAccountMenu(false);
   updateAccountLabel();
@@ -761,6 +766,8 @@ async function init() {
   if (!store.get("userChosen", false) && demoUsers.length && state.userId.startsWith("guest-")) {
     state.userId = String(demoUsers[0].user_id);
     store.set("userId", state.userId);
+    state.cart = store.get(cartKey(state.userId), []);
+    updateCartCount();
   }
   store.set("userChosen", true);
   updateAccountLabel();

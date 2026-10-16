@@ -101,7 +101,7 @@ class RankingContext:
 
 
 def raw_factors(ctx: RankingContext, item: Item) -> dict[str, float | None]:
-    """Un-normalised factor values; ALS and popularity are scaled across the candidate set afterwards."""
+    """Un-normalised factor values; popularity is scaled across the candidate set afterwards."""
     price = item.get("price")
     price_fit = 0.0
     if price and ctx.reference_price:
@@ -157,13 +157,14 @@ def rank(ctx: RankingContext, candidates: list[tuple[Item, str]], limit: int) ->
     profile_name = "product" if ctx.context_item else "home"
     profile = RANKING_PROFILES[profile_name]
     scored = [(item, source, raw_factors(ctx, item)) for item, source in candidates]
-    max_als = max((f["als"] or 0.0 for _, _, f in scored), default=0.0)
     max_pop = max((f["popularity"] for _, _, f in scored), default=0.0)
 
     results = []
     for item, source, f in scored:
         raw_als = f["als"]
-        values = {**f, "als": (raw_als or 0.0) / max_als if max_als else 0.0,
+        # Implicit ALS predicts a 0..1 preference: clip it rather than scaling to the best
+        # candidate, so a weak cold-start match isn't inflated to 1.0
+        values = {**f, "als": min(raw_als or 0.0, 1.0),
                   "popularity": f["popularity"] / max_pop if max_pop else 0.0}
         final = sum(weight * values[key] for key, _, weight in profile)
         factors = [
