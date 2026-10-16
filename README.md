@@ -10,6 +10,15 @@ pipeline, and a demo storefront with a debug panel shows why every item is recom
 python run.py        # brings the whole system up, in order, and opens the storefront
 ```
 
+**Docs:** this README is the full reference. [howtorun.md](howtorun.md) is the step-by-step runbook for a demo,
+and [PROGRESS.md](PROGRESS.md) is the dated build log with decisions and measured results.
+
+**Goal.** Recommend products from implicit signals (views, cart adds, purchases) rather than ratings, as a real system
+(event stream → data lake → distributed training → cache → live API) that adapts within a session, not as a notebook.
+Built by a team of two working in parallel tracks against one frozen event schema (`data/schema.json`):
+**Data + ML** (ingestion, Spark feature engineering, ALS, TF-IDF, evaluation) and **Systems + Serving**
+(Docker stack, Airflow, FastAPI, Redis, experimentation, monitoring).
+
 ---
 
 ## Contents
@@ -74,6 +83,8 @@ candidates, scores them against the user's profile, the product on screen and th
 ---
 
 ## 2. Quick start
+
+For a guided first run with expected output at each step, follow [howtorun.md](howtorun.md).
 
 ### Requirements
 
@@ -183,7 +194,7 @@ Each event shows a toast such as *"re-ranked 76 candidates in 53 ms · 7 positio
 
 **Source:** [REES46 eCommerce behavior data](https://www.kaggle.com/datasets/mkechinov/ecommerce-behavior-data-from-multi-category-store), October 2019.
 
-**Cleaning** (SQL, see `progress.txt`): the result is `final_cleaned_dataset.csv` with 3,582,337 rows (Oct 1–5 2019), no nulls in required
+**Cleaning** (SQL, see `PROGRESS.md`): the result is `final_cleaned_dataset.csv` with 3,582,337 rows (Oct 1–5 2019), no nulls in required
 fields, `price > 0`, and `event_type ∈ {view, cart, purchase, remove_from_cart}`. The contract is in `data/schema.json`:
 
 | Field | Type | Notes |
@@ -333,24 +344,25 @@ because it loads the 5,000-item search index into memory.
 
 ## 7. Results
 
-The current run uses a 13,582-event slice (Oct 3, 16:59–17:11), with 2,730 users, 3,169 items and 7,011 (user, item) pairs (density 0.081%).
-53.4% of users are cold-start (≤ 3 events). The Insights page shows the live numbers from the last run.
+The current run uses a 150,000-event sample (Oct 3 16:59 → Oct 4 01:15, 2019): 25,046 users, 15,539 items and 93,235
+(user, item) pairs (density 0.024%). 53.7% of users are cold-start (≤ 3 events). The Insights page shows the live numbers
+from the last run.
 
 Offline evaluation, K = 10, 80/20 hold-out:
 
 | Segment | Model | Hit rate | Recall | Precision | Coverage |
 |---|---|---|---|---|---|
-| All users (n = 761) | **ALS** | **11.8%** | **9.3%** | 1.2% | **8.0%** |
-| | Popularity | 10.5% | 8.2% | 1.1% | 0.5% |
-| Cold-start (n = 495) | **TF-IDF** | **19.4%** | **16.5%** | **2.0%** | **30.3%** |
-| | ALS | 11.1% | 9.1% | 1.2% | 7.5% |
-| | Popularity | 10.3% | 8.6% | 1.1% | 0.4% |
+| All users (n = 8,797) | **ALS** | **20.3%** | **14.6%** | **2.3%** | **1.6%** |
+| | Popularity | 13.9% | 10.0% | 1.5% | 0.1% |
+| Cold-start (n = 4,356) | **TF-IDF** | **28.3%** | **24.1%** | **3.0%** | **7.7%** |
+| | ALS | 20.4% | 17.6% | 2.2% | 1.4% |
+| | Popularity | 15.1% | 12.7% | 1.6% | 0.1% |
 
 How to read it:
-- **TF-IDF roughly doubles hit rate for cold-start users** compared with ALS and popularity, which is why they are routed to it.
-- **ALS vs popularity on all users is within noise on this small slice.** Its clear win is coverage (8% vs 0.5% of the catalog),
-  i.e. it personalises instead of showing everyone the same bestsellers. On the full dataset, ALS reached a 19.2% vs 12.6% hit rate@20 (`progress.txt`).
-- Precision is low by construction: users average about 2 held-out items, so even a perfect top-10 caps at about 20%.
+- **ALS beats popularity by about 6 points of hit rate** on all users, and recommends 16× more distinct items.
+- **TF-IDF is the best model for cold-start users** (+8 points over ALS, +13 over popularity), which is why they are routed to it.
+- Precision is low by construction: users have only a few held-out items, so even a perfect top-10 has a low ceiling.
+- The split is random rather than time-based, so treat these as optimistic (see [Known limitations](#13-known-limitations--roadmap)).
 
 ---
 
@@ -409,6 +421,7 @@ ingestion/                     kafka_producer.py, hdfs_writer.py, Dockerfiles
 processing/
   utils/                       spark_session.py, weighting.py
   spark_jobs/                  the 8 pipeline jobs
+  explore_hdfs.py              quick HDFS stats (events, users, density); run inside the airflow container
 orchestration/airflow/
   Dockerfile                   Airflow + Java 17 + PySpark
   dags/pipeline_jobs.py        job order + spark-submit command (shared with run.py)
@@ -422,9 +435,10 @@ serving/
 experimentation/               A/B bucketing + Postgres event logger (not yet wired into the API)
 infra/postgres/init.sql        experiment_assignments, recommendation_events tables
 monitoring/                    Prometheus / Grafana config
-notebooks/                     eda.ipynb, offline_eval_playground.ipynb
+notebooks/                     eda.ipynb
 tests/                         pytest suite
-progress.txt                   dated build log with decisions and measured results
+howtorun.md                    step-by-step demo runbook
+PROGRESS.md                    dated build log with decisions and measured results
 ```
 
 ---
@@ -462,7 +476,10 @@ SparkSession fixture in `tests/conftest.py` and are skipped if PySpark isn't ins
 ## 13. Known limitations & roadmap
 
 **Limitations**
-- Small demo slice (10k events, about 12 minutes of traffic), so metrics have wide error bars. Scale up with `--reingest --sample-size 100000`.
+- The demo sample covers only about 8 hours of traffic (150k events). Scale up with `--reingest --sample-size <n>`.
+- Over 8 hours the 14-day time-decay half-life has almost no effect: every event keeps about 99% of its weight.
+- `evaluate_model.py` uses a random 80/20 split, not a time-based one, so future events can leak into training and the
+  offline metrics are likely optimistic.
 - No product titles or images in the dataset; names and pictures are generated (see above).
 - Complements only cover categories that exist in the slice. There are no phone cases in it, and a few weak pairs (e.g. smartphone → underwear,
   3 shoppers) survive the threshold but rank low. More data (`--sample-size`) sharpens them.
@@ -472,8 +489,8 @@ SparkSession fixture in `tests/conftest.py` and are skipped if PySpark isn't ins
 
 **Roadmap**
 1. A/B test: bucket users with `experimentation/bucketing.py` (treatment = hybrid re-ranker, control = popularity) and log
-   impressions/clicks/purchases to Postgres with `experimentation/logger.py`, then compute CTR/conversion and significance in `stats_job.py`.
-2. Thompson-sampling bandit over the candidate pool (`realtime/bandit.py`) and a Kafka session consumer (`realtime/session_consumer.py`).
+   impressions/clicks/purchases to Postgres with `experimentation/logger.py`, then compute CTR/conversion and significance.
+2. Thompson-sampling bandit over the candidate pool, and a Kafka consumer that builds session vectors.
 3. Prometheus metrics on the API (latency, Redis hit rate) and a Grafana dashboard.
 4. Learn the re-ranker weights from logged clicks instead of hand-setting them.
 5. Make ingestion idempotent (event ids or offset-based slicing) and evaluate on the full 3.58M events.

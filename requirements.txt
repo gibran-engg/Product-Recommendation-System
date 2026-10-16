@@ -2,10 +2,10 @@
 # Product Recommendation System — Full Project Requirements
 # ============================================================
 # Organized by which service/track each dependency belongs to.
-# For Docker builds, each service should still use its own
-# scoped requirements.txt (see notes at the bottom) — this file
-# is for local/Colab development where you want everything
-# available in one environment.
+# For local development and tests (pip install -r requirements.txt).
+# Docker images install their own scoped files instead:
+# serving/requirements.txt, orchestration/airflow/requirements.txt,
+# ingestion/docker/*-requirements.txt.
 
 # --- Ingestion (Kafka producers/consumers) -------------------
 kafka-python>=2.0.2
@@ -18,9 +18,6 @@ matplotlib>=3.9.0
 scikit-learn>=1.4.0
 pyarrow>=15.0.0          # Parquet support for Spark/Pandas interop
 
-# --- Real-Time Layer (session consumer + bandit) --------------
-# (kafka-python and numpy above already cover this)
-
 # --- Serving Layer (API + cache) -------------------------------
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
@@ -28,7 +25,7 @@ redis>=5.0.0
 pydantic>=2.6.0
 
 # --- Experimentation (A/B testing + stats) ----------------------
-psycopg2-binary>=2.9.9
+psycopg[binary]>=3.1        # experimentation/logger.py uses the psycopg 3 API
 scipy>=1.12.0
 
 # --- Monitoring -------------------------------------------------
@@ -51,11 +48,7 @@ hdfs>=2.7.0
 #   Airflow has strict, version-specific dependency constraints
 #   that conflict with a general requirements.txt. Install it
 #   using their official constraints file, or better, just use
-#   the official Airflow Docker image (already planned in
-#   orchestration/airflow/Dockerfile) instead of pip-installing
-#   it locally.
+#   the Airflow Docker image (orchestration/airflow/Dockerfile)
+#   instead of pip-installing it locally.
 #   Reference: https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html
-#
-# React / Node dependencies (frontend/) — managed via package.json,
-#   not this file.
 # ============================================================
